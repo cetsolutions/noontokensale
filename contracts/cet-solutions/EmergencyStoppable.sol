@@ -1,10 +1,9 @@
-// solhint-disable-next-line compiler-fixed, compiler-gt-0_4
-pragma solidity ^0.4.17;
+pragma solidity 0.4.24;
 
-import "./Administrable.sol";
+import "../zeppelin-solidity/contracts/ownership/Ownable.sol";
 
 
-contract EmergencyStoppable is Administrable {
+contract EmergencyStoppable is Ownable {
 
     bool public emergencyModeOn = false;
 
@@ -21,14 +20,14 @@ contract EmergencyStoppable is Administrable {
         _;
     }
 
-    function declareEmergency() public onlyOwner onlyInNotEmergency {
-        EmergencyDeclared(msg.sender);
+    function declareEmergency() external onlyOwner onlyInNotEmergency {
+        emit EmergencyDeclared(msg.sender);
 
         emergencyModeOn = true;
     }
 
-    function cancelEmergency() public onlyOwner onlyInEmergency {
-        EmergencyCancelled(msg.sender);
+    function cancelEmergency() external onlyOwner onlyInEmergency {
+        emit EmergencyCancelled(msg.sender);
 
         emergencyModeOn = false;
     }

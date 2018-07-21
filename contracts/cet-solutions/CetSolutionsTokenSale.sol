@@ -1,5 +1,4 @@
-// solhint-disable-next-line compiler-fixed, compiler-gt-0_4
-pragma solidity ^0.4.17;
+pragma solidity 0.4.24;
 
 import "./CetSolutionsCoin.sol";
 import "./Administrable.sol";
@@ -10,8 +9,8 @@ import "../zeppelin-solidity/contracts/math/SafeMath.sol";
 contract CetSolutionsTokenSale is Administrable {
     using SafeMath for uint256;
 
-    address private mia;
-    address private fundCollector;
+    address public mia;
+    address public fundCollector;
 
     CetSolutionsCoin public tokenContract;
 
@@ -24,13 +23,13 @@ contract CetSolutionsTokenSale is Administrable {
     event SaleStarted(address indexed by);
     event SaleEnded(address indexed by);
     event TokenPriceChanged(uint256 newValue, address indexed by);
-    event TokensPurchased(address indexed buyer, uint price, uint256 amount);
-    event AmountRefunded(uint amount, address indexed to);
+    event TokensPurchased(address indexed buyer, uint256 price, uint256 amount);
+    event AmountRefunded(uint256 amount, address indexed to);
     event TokenSaleEndedAutomatically(address indexed lastBuyer);
     event TokensIssuedManually(address indexed issuer, address indexed recipient, uint256 amount);
     event FundCollectorAccountChanged(address indexed previous, address indexed newAddress, address indexed by);
 
-    function CetSolutionsTokenSale(
+    constructor(
         address _mia, 
         address _fundCollector,
         uint256 _minimumTokenAmount, 
@@ -41,62 +40,34 @@ contract CetSolutionsTokenSale is Administrable {
 
         minimumTokenAmount = _minimumTokenAmount;
         tokensPerWei = _tokensPerWei;
-
     }
 
-    function startSale() public onlyOwner {
+    function startSale() external onlyOwner {
         require(saleClosed == false);
 
-        SaleStarted(msg.sender);
+        emit SaleStarted(msg.sender);
         
         saleIsRunning = true;
     }
 
-    function endSale() public onlyOwner {
-        SaleEnded(msg.sender);
-
+    function endSale() external onlyOwner {
+        require(saleIsRunning == true);
         _endTokenSale();
     }
 
-    function changeTokensPerWei(uint256 _newValue) public onlyAccount( mia ) {
-        TokenPriceChanged(_newValue, msg.sender);
+    function changeTokensPerWei(uint256 _newValue) external onlyAccount( mia ) {
+        emit TokenPriceChanged(_newValue, msg.sender);
 
         tokensPerWei = _newValue;
     }
 
-    function changeFundCollector(address _newFundCOllector) public onlyOwner {
-        FundCollectorAccountChanged(fundCollector, _newFundCOllector, msg.sender);
+    function changeFundCollector(address _newFundCollector) external onlyOwner addressNotNull(_newFundCollector) {
+        emit FundCollectorAccountChanged(fundCollector, _newFundCollector, msg.sender);
 
-        fundCollector = _newFundCOllector;
+        fundCollector = _newFundCollector;
     }
-/*
-    function purchaseToken() public payable {
-        require(saleIsRunning == true);
 
-        uint256 tokensToBuy = msg.value.mul(tokensPerWei);
-        require(tokensToBuy >= minimumTokenAmount);
-
-        uint256 remaining = tokenContract.remainingTokens(); 
-
-        if (tokensToBuy >= remaining) {
-            uint256 refund = (tokensToBuy.sub(remaining)).div(tokensPerWei); 
-        
-            _purcacheHelper(remaining, msg.value.sub(refund));
-
-            if (refund > 0) {
-                AmountRefunded(refund, msg.sender);
-                msg.sender.transfer(refund);
-            }
-
-            _endTokenSale();
-
-            TokenSaleEndedAutomatically(msg.sender);
-        } else {
-            _purcacheHelper(tokensToBuy, msg.value);
-        }
-    }
-*/
-    function purchaseToken() public payable {
+    function purchaseToken() external payable {
         require(saleIsRunning == true);
 
         uint256 tokensToBuy = msg.value.mul(tokensPerWei);
@@ -108,51 +79,55 @@ contract CetSolutionsTokenSale is Administrable {
             uint256 refund = (tokensToBuy.sub(remaining)).div(tokensPerWei); 
         
             uint256 investment = msg.value.sub(refund);
-            tokenContract.issueToken(msg.sender, remaining);
+            tokenContract.issueToken(remaining, msg.sender);
             fundCollector.transfer(investment);
 
-            TokensPurchased(msg.sender, investment, tokensToBuy);
+            emit TokensPurchased(msg.sender, investment, remaining);
             if (refund > 0) {
-                AmountRefunded(refund, msg.sender);
+                emit AmountRefunded(refund, msg.sender);
                 msg.sender.transfer(refund);
             }
 
             _endTokenSale();
 
-            TokenSaleEndedAutomatically(msg.sender);
+            emit TokenSaleEndedAutomatically(msg.sender);
         } else {
-            tokenContract.issueToken(msg.sender, tokensToBuy);
+            tokenContract.issueToken(tokensToBuy, msg.sender);
             fundCollector.transfer(msg.value);
+            emit TokensPurchased(msg.sender, msg.value, tokensToBuy);
         }
     }
 
-    function issueToken(address _to, uint256 _amount) public onlyAccount( mia ) {
-        TokensIssuedManually(msg.sender, _to, _amount);
+    function issueToken(uint256 _amount, address _to) external onlyAccount( mia ) {
+        require(saleIsRunning == true);
+        emit TokensIssuedManually(msg.sender, _to, _amount);
 
-        tokenContract.issueToken(_to, _amount);
+        tokenContract.issueToken(_amount, _to);
+    }
+
+    function changeMia(address _newMia) external addressNotNull(_newMia) returns(bool) {
+        require(msg.sender == owner || msg.sender == mia);
+        
+        mia = _newMia;
+
+        return true;
     }
 
     function _endTokenSale() private {
-        require(saleIsRunning == true);
-
-        SaleEnded(msg.sender);
+        emit SaleEnded(msg.sender);
 
         saleIsRunning = false;
         saleClosed = true;
 
         mia = owner;
 
+        
         tokenContract.openSecondaryMarket();
-        if (this.balance > 0) {
-            fundCollector.transfer(this.balance);
+        
+        tokenContract.changeTSA(owner);
+
+        if (address(this).balance > 0) {
+            fundCollector.transfer(address(this).balance);
         }
     }
-/*
-    function _purcacheHelper(uint256 _tokenCount, uint256 _investment) private {
-        tokenContract.issueToken(msg.sender, _tokenCount);
-        fundCollector.transfer(_investment);
-
-        TokensPurchased(msg.sender, _investment, _tokenCount);
-    }
-*/
 }
