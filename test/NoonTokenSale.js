@@ -44,6 +44,10 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
             assert.equal(await token.decimals(), 18)
         })
 
+        it('should have totalSupply()', async () => {
+            utils.equalBig(await token.totalSupply(), await token.INITIAL_SUPPLY())
+        })
+
         it('should have set the administrator and owner accounts set correctly', async () => {
             assert.equal(await tokenSale.mia(), MIA)
             assert.equal(await tokenSale.fundCollector(), fundCollector)

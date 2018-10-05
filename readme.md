@@ -16,7 +16,7 @@ The launch date of the ICO is yet to be determined.
 Until then we accept bug reports.
 
  ## Testing
- The address of the tokens sale contract on Rinkeby is [`0x0xf973b420db871823db4c6dc86370809b4721727a`](https://rinkeby.etherscan.io/address/0x0xf973b420db871823db4c6dc86370809b4721727a) and the Token is [`0xc1b7be3f310035072cc8769628b030378a23f02b`](https://rinkeby.etherscan.io/token/0xc1b7be3f310035072cc8769628b030378a23f02b)
+ The address of the tokens sale contract on Rinkeby is [`0x6f8bbbb1aff05419edf07484c0b12740ab586a2f`](https://rinkeby.etherscan.io/address/0x6f8bbbb1aff05419edf07484c0b12740ab586a2f) and the Token is [`0xa6450dce496281eab766907829268e42a22a6dd6`](https://rinkeby.etherscan.io/token/0xa6450dce496281eab766907829268e42a22a6dd6)
  To test the token purchase you have to be on the white list. If you want an address to be white listed contact us here on GitHub or email us at `szatixx [at] gmail [dot] com`.
 
  The ABI of the [Token Sale](docs/TokenSale_ABI.json) and the [Token](docs/NoonCoin_ABI.json) is in the docs folder. 

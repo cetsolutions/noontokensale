@@ -15,5 +15,6 @@ contract NoonCoin is CetSolutionsCoin {
 
     constructor(address _owner, address _wla) public CetSolutionsCoin(_owner, _wla, msg.sender) {
         balances[tsa] = INITIAL_SUPPLY;
+        totalSupply_ = INITIAL_SUPPLY;
     }
 }
