@@ -21,6 +21,10 @@ Until then we accept bug reports.
 
  The ABI of the [Token Sale](docs/NoonTokenSale_ABI.json) and the [Token](docs/NoonCoin_ABI.json) is in the docs folder. 
 
+## Main net
+The main net addresses of the contracts are [`0xc962a5aae3bf04e6584cb70f1bf66de9a3c0dc74`](https://etherscan.io/address/0xc962a5aae3bf04e6584cb70f1bf66de9a3c0dc74) and [`0x501087ef7d7c42584228d7de26a030e89255e5e4`](https://etherscan.io/token/0x501087ef7d7c42584228d7de26a030e89255e5e4). 
+If you are interrested in the Noon Coin ICO please contact us at the [project's website](https://blockchain.noon.sg/).
+
 ## Documentation
 You can find the requirements for the SCs [here](docs/requirements.pdf).
 The specification for integration testing [here](docs/specifications.pdf).
