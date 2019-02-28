@@ -16,17 +16,20 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
 
     let token
 
-    let tokensPerWei = new BigNumber(61793)
+    let RATE = 4.3668 /* NDC / ETH */
+    let tokensPerGwei = new BigNumber(Math.pow(10, 9)).times(RATE)
+    let tokensPerEth = tokensPerGwei.times(Math.pow(10, 9))
 
-    let minimumTokenAmount = new BigNumber(100000).multipliedBy(new BigNumber(10).pow(18)).plus(15670)
-
+    // For testing purposes, this value should be a multiple of tokensPerGwei
+    // In real use this requirement does not apply
+    let minimumTokenAmount = new BigNumber('35881454212869600000')
     beforeEach('set up the token sale', async () => {
         BigNumber.set({
             DECIMAL_PLACES: 30
         })
         NoonTokenSale.setProvider(provider)
         NoonCoin.setProvider(provider)
-        tokenSale = await NoonTokenSale.new(MIA, WLA, fundCollector, minimumTokenAmount.toString(), tokensPerWei.toString())
+        tokenSale = await NoonTokenSale.new(MIA, WLA, fundCollector, minimumTokenAmount.toString(), tokensPerEth.toString())
         token = new NoonCoin(await tokenSale.tokenContract())
     })
 
@@ -160,18 +163,22 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
     })
 
     describe('Exchange ratio', () => {
-        it('should have a token exchange rate of ' + tokensPerWei.toString(), async () => {
-            utils.equalBig(await tokenSale.tokensPerWei(), tokensPerWei)
+        it('should have a token exchange rate of ' + tokensPerEth.toString(), async () => {
+            utils.equalBig(await tokenSale.tokensPerEth(), tokensPerEth)
+        })
+
+        it('should have a token exchange rate of (Gwei) ' + tokensPerGwei.toString(), async () => {
+            utils.equalBig(await tokenSale.tokensPerGwei(), tokensPerGwei)
         })
 
         it('should allow the MIA to change the token exchange rate', async () => {
-            assert.isOk(await tokenSale.changeTokensPerWei(tokensPerWei.plus(10).toString(), {from: MIA}))
-            utils.equalBig(await tokenSale.tokensPerWei(), tokensPerWei.plus(10))
+            assert.isOk(await tokenSale.changeTokensPerEth(tokensPerEth.plus(Math.pow(10, 9)).toString(), {from: MIA}))
+            utils.equalBig(await tokenSale.tokensPerEth(), tokensPerEth.plus(Math.pow(10, 9)))
         })
 
         it('should not allow other users to change the token exchange rate', async () => {
-            await utils.expectThrow(tokenSale.changeTokensPerWei(tokensPerWei.plus(10).toString(), {from: buyer1}))
-            utils.equalBig(await tokenSale.tokensPerWei(), tokensPerWei)
+            await utils.expectThrow(tokenSale.changeTokensPerEth(tokensPerEth.plus(Math.pow(10, 9)).toString(), {from: buyer1}))
+            utils.equalBig(await tokenSale.tokensPerEth(), tokensPerEth)
         })
     })
 
@@ -183,25 +190,25 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
         })
 
         const valid_purchases = [
-            [minimumTokenAmount.dividedToIntegerBy(tokensPerWei), minimumTokenAmount],
-            [minimumTokenAmount.plus(tokensPerWei).dividedToIntegerBy(tokensPerWei), minimumTokenAmount.plus(tokensPerWei)],
-            [minimumTokenAmount.times(2).dividedToIntegerBy(tokensPerWei), minimumTokenAmount.times(2)]
+            [minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).integerValue(), minimumTokenAmount],
+            [minimumTokenAmount.plus(tokensPerGwei).dividedToIntegerBy(tokensPerGwei).times(1e9).integerValue(), minimumTokenAmount.plus(tokensPerGwei)],
+            [minimumTokenAmount.times(2).dividedToIntegerBy(tokensPerGwei).times(1e9).integerValue(), minimumTokenAmount.times(2)]
         ]
         valid_purchases.forEach(([etherAmount, tokenAmount]) => {
             it('should allow to purchase tokens (' + etherAmount.toString() + ' wei for ' + tokenAmount.toString() + ' tokens)', async () => {
-                assert.isOk(await tokenSale.purchaseToken({from: buyer1, value: etherAmount.toString()}))
+                assert.isOk(await tokenSale.sendTransaction({from: buyer1, value: etherAmount.toString()}))
                 utils.equalBig(await token.remainingTokens(), (await token.INITIAL_SUPPLY()).minus(tokenAmount))
                 utils.equalBig(await token.balanceOf(buyer1), tokenAmount)
             })
         })
 
         const invalid_purchases = [
-            [minimumTokenAmount.minus(tokensPerWei).dividedToIntegerBy(tokensPerWei)],
-            [minimumTokenAmount.minus(tokensPerWei.times(10)).dividedToIntegerBy(tokensPerWei)]
+            [minimumTokenAmount.minus(tokensPerGwei).dividedToIntegerBy(tokensPerGwei).times(1e9)],
+            [minimumTokenAmount.minus(tokensPerGwei.times(10)).dividedToIntegerBy(tokensPerGwei).times(1e9)]
         ]
         invalid_purchases.forEach(([etherAmount]) => {
             it('should not allow to purchase less than the minimum amount of tokens (' + etherAmount.toString() + ' wei)', async () => {
-                await utils.expectThrow(tokenSale.purchaseToken({from: buyer1, value: etherAmount.toString()}))
+                await utils.expectThrow(tokenSale.sendTransaction({from: buyer1, value: etherAmount.toString()}))
                 utils.equalBig(await token.remainingTokens(), (await token.INITIAL_SUPPLY()))
                 utils.equalBig(await token.balanceOf(buyer1), 0)
             })
@@ -237,20 +244,20 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
         })
 
         it('should not allow non white listed people to purchase token', async () => {
-            await utils.expectThrow(tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1}))
+            await utils.expectThrow(tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1}))
             utils.equalBig(await token.balanceOf(buyer1), 0)
             utils.equalBig(await token.remainingTokens(), await token.INITIAL_SUPPLY())
         })
 
         it('should allow whitelisted people to purchase tokens', async () => {
             await token.addToWhitelist(buyer1, {from: WLA})
-            assert.isOk(await tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1}))
+            assert.isOk(await tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1}))
         })
 
         it('should allow token owner to transfer tokens to whitelisted address', async () => {
             await token.addToWhitelist(buyer1, {from: WLA})
             await token.addToWhitelist(buyer2, {from: WLA})
-            await tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1})
+            await tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1})
             await tokenSale.endSale({from:owner})
 
             assert.isOk(await token.transfer(buyer2, minimumTokenAmount.toString(), {from: buyer1}))
@@ -258,7 +265,7 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
 
         it('should fail to transfer tokens to non whitelisted address', async () => {
             await token.addToWhitelist(buyer1, {from: WLA})
-            await tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1})
+            await tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1})
             await tokenSale.endSale({from:owner})
 
             await utils.expectThrow(token.transfer(buyer2, minimumTokenAmount.toString(), {from: buyer1}))
@@ -266,7 +273,7 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
 
         it('should fail to transferFrom tokens to non whitelisted address', async () => {
             await token.addToWhitelist(buyer1, {from: WLA})
-            await tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1})
+            await tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1})
             await tokenSale.endSale({from:owner})
             await token.approve(buyer3, minimumTokenAmount.toString(), {from: buyer1})
 
@@ -279,7 +286,7 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
         it('should allow to transferFrom tokens to whitelisted address', async () => {
             await token.addToWhitelist(buyer1, {from: WLA})
             await token.addToWhitelist(buyer2, {from: WLA})
-            await tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1})
+            await tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1})
             await tokenSale.endSale({from:owner})
             await token.approve(buyer3, minimumTokenAmount.toString(), {from: buyer1})
 
@@ -349,8 +356,8 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
             const newFundCollectorBalance = web3.eth.getBalance(newFundcollector)
             assert.isOk(await tokenSale.changeFundCollector(newFundcollector))
             assert.equal(await tokenSale.fundCollector(), newFundcollector)
-            assert.isOk(await tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1}))
-            utils.equalBig(web3.eth.getBalance(newFundcollector).minus(newFundCollectorBalance), minimumTokenAmount.dividedToIntegerBy(tokensPerWei))
+            assert.isOk(await tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1}))
+            utils.equalBig(web3.eth.getBalance(newFundcollector).minus(newFundCollectorBalance), minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9))
             utils.equalBig(web3.eth.getBalance(fundCollector).minus(fundCollectorBalance), 0)
         })
 
@@ -365,14 +372,14 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
         it('should not allow to purchase while emergeny mode is on', async () => {
             assert.isOk(await token.declareEmergency({from: owner}))
             assert.isOk(await token.emergencyModeOn())
-            await utils.expectThrow(tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1}))
+            await utils.expectThrow(tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1}))
         })
 
         it('should allow to purchase while emergeny mode is off', async () => {
             await token.declareEmergency({from: owner})
             assert.isOk(await token.cancelEmergency({from: owner}))
             assert.isNotOk(await token.emergencyModeOn())
-            assert.isOk(await tokenSale.purchaseToken({value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString(), from: buyer1}))
+            assert.isOk(await tokenSale.sendTransaction({value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString(), from: buyer1}))
         })
 
         it('shuold throw if non owner tries to declare emergency', async () => {
@@ -494,7 +501,7 @@ contract('NoonTokenSale', ([owner, MIA, WLA, fundCollector, buyer1, buyer2, buye
 
         it('should not allow to purchase token in a closed sale', async () => {
             await tokenSale.endSale({from: owner})
-            await utils.expectThrow(tokenSale.purchaseToken({from: buyer1, value: minimumTokenAmount.dividedToIntegerBy(tokensPerWei).toString()}))
+            await utils.expectThrow(tokenSale.sendTransaction({from: buyer1, value: minimumTokenAmount.dividedToIntegerBy(tokensPerGwei).times(1e9).toString()}))
         })
 
         it('should not allow to issue token in a closed sale', async () => {

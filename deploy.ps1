@@ -1,9 +1,13 @@
+param (
+    [string]$network = "rinkeby"
+)
+
 truffle compile
 if ($?)
 {
     Write-Output "Compilation succeeded."
-    Write-Output "Starting deployment."
-    truffle exec deploy.js --network rinkeby
+    Write-Output "Starting deployment on '$network' network."
+    truffle exec deploy.js --network $network
 }
 else
 {

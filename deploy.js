@@ -39,13 +39,13 @@ module.exports = async () => {
         if (typeof config.minimumTokenAmount != 'number')
             throw `Invalid configuration! Field 'minimumTokenAmount' must be defined as a number`
 
-        if (typeof config.tokensPerWei != 'number')
+        if (typeof config.tokensPerEth != 'number')
             throw `Invalid configuration! Field 'minimumTokenAmount' must be defined as a number`
     })
         
     console.log(`Deploying contracts with the following settings:`);
     console.log(`Minimum token amount: ${config.minimumTokenAmount}`);
-    console.log(`Tokens per Wei: ${config.tokensPerWei}`);
+    console.log(`Tokens per ETH: ${config.tokensPerEth}`);
     console.log(`Continue? (Y/n)`);
     
     rl.prompt();
@@ -68,7 +68,7 @@ module.exports = async () => {
     
             console.log('');
             
-            let tokenSale = await TokenSaleContract.new(wallets.mia, wallets.wla, wallets.fundcollector, config.minimumTokenAmount, config.tokensPerWei)
+            let tokenSale = await TokenSaleContract.new(wallets.mia, wallets.wla, wallets.fundcollector, config.minimumTokenAmount, config.tokensPerEth)
             let token = new TokenContract(await tokenSale.tokenContract());
             console.log(`Token sale contract created: ${tokenSale.address}`)
             console.log(`Token contract address: ${token.address}`)

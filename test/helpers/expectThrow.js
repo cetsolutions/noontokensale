@@ -16,7 +16,7 @@ export default async promise => {
         invalidOpcode || outOfGas || revert,
         'Expected throw, got \'' + error + '\' instead',
       );
-      return;
+      return error;
     }
     assert.fail('Expected throw not received');
   };

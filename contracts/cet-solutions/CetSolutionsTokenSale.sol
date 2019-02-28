@@ -18,7 +18,7 @@ contract CetSolutionsTokenSale is Administrable {
     bool public saleClosed = false;
 
     uint256 public minimumTokenAmount = 1;
-    uint256 public tokensPerWei = 1;
+    uint256 public tokensPerGwei = 1;
 
     event SaleStarted(address indexed by);
     event SaleEnded(address indexed by);
@@ -33,13 +33,13 @@ contract CetSolutionsTokenSale is Administrable {
         address _mia, 
         address _fundCollector,
         uint256 _minimumTokenAmount, 
-        uint256 _tokensPerWei) public {
+        uint256 _tokensPerEth) public {
 
         mia = _mia;
         fundCollector = _fundCollector;
 
         minimumTokenAmount = _minimumTokenAmount;
-        tokensPerWei = _tokensPerWei;
+        _changeTokensPerEth(_tokensPerEth);
     }
 
     function startSale() external onlyOwner {
@@ -55,10 +55,18 @@ contract CetSolutionsTokenSale is Administrable {
         _endTokenSale();
     }
 
-    function changeTokensPerWei(uint256 _newValue) external onlyAccount( mia ) {
-        emit TokenPriceChanged(_newValue, msg.sender);
+    function changeTokensPerEth(uint256 tokensPerEth) external onlyAccount( mia ) {
+        emit TokenPriceChanged(tokensPerEth, msg.sender);
 
-        tokensPerWei = _newValue;
+        _changeTokensPerEth(tokensPerEth);
+    }
+
+    function _changeTokensPerEth(uint256 tokensPerEth) private {
+        tokensPerGwei = tokensPerEth.div(1e9);
+    }
+
+    function tokensPerEth() external view returns (uint256) {
+        return tokensPerGwei.mul(1e9);
     }
 
     function changeFundCollector(address _newFundCollector) external onlyOwner addressNotNull(_newFundCollector) {
@@ -67,18 +75,25 @@ contract CetSolutionsTokenSale is Administrable {
         fundCollector = _newFundCollector;
     }
 
-    function purchaseToken() external payable {
+    function () external payable {
+        require(msg.data.length == 0);
         require(saleIsRunning == true);
 
-        uint256 tokensToBuy = msg.value.mul(tokensPerWei);
+        uint gwei = msg.value.div(1e9);
+        uint256 change = msg.value.sub(gwei.mul(1e9));
+        if (change > 0) {
+            msg.sender.transfer(change);
+        }
+
+        uint256 tokensToBuy = gwei.mul(tokensPerGwei);
         require(tokensToBuy >= minimumTokenAmount);
 
         uint256 remaining = tokenContract.remainingTokens(); 
 
         if (tokensToBuy >= remaining) {
-            uint256 refund = (tokensToBuy.sub(remaining)).div(tokensPerWei); 
+            uint256 refund = (tokensToBuy.sub(remaining).div(tokensPerGwei).mul(1e9)); 
         
-            uint256 investment = msg.value.sub(refund);
+            uint256 investment = msg.value.sub(refund).sub(change);
             tokenContract.issueToken(remaining, msg.sender);
             fundCollector.transfer(investment);
 
@@ -93,8 +108,8 @@ contract CetSolutionsTokenSale is Administrable {
             emit TokenSaleEndedAutomatically(msg.sender);
         } else {
             tokenContract.issueToken(tokensToBuy, msg.sender);
-            fundCollector.transfer(msg.value);
-            emit TokensPurchased(msg.sender, msg.value, tokensToBuy);
+            fundCollector.transfer(msg.value.sub(change));
+            emit TokensPurchased(msg.sender, msg.value.sub(change), tokensToBuy);
         }
     }
 
